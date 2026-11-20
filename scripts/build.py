@@ -48,14 +48,14 @@ def main():
     prs = pages(f'repos/{SOURCE}/pulls?state=open')
     main_sha = next(b['commit']['sha'] for b in branches if b['name'] == 'main')
     versions = []
-    for branch in sorted(branches, key=lambda b: (b['name'] != 'main', b['name'])):
+    for branch in sorted(branches, key=lambda b: b['name']):
         name, sha = branch['name'], branch['commit']['sha']
-        if name != 'main' and (sha == main_sha or api(
+        if sha == main_sha or api(
             f'repos/{SOURCE}/compare/{main_sha}...{sha}?per_page=1'
-        )['ahead_by'] == 0):
+        )['ahead_by'] == 0:
             continue
         pr = next((p for p in prs if p['head']['ref'] == name and p['head']['repo'] and p['head']['repo']['full_name'] == SOURCE), None)
-        key = 'main' if name == 'main' else f"pr-{pr['number']}" if pr else 'branch-' + hashlib.sha256(name.encode()).hexdigest()[:12]
+        key = f"pr-{pr['number']}" if pr else 'branch-' + hashlib.sha256(name.encode()).hexdigest()[:12]
         versions.append({'id': key, 'branch': name, 'sha': sha, 'path': key + '/', 'pr': pr['html_url'] if pr else None, 'title': pr['title'] if pr else name})
     fingerprint = hashlib.sha256(json.dumps(versions, sort_keys=True).encode()).hexdigest()
     if os.environ.get('FORCE_BUILD') == 'false':
@@ -75,9 +75,11 @@ def main():
         checkout = Path(temporary)
         git(checkout, 'init', '-q')
         git(checkout, 'remote', 'add', 'origin', 'https://github.com/' + SOURCE + '.git')
+        if versions:
+            commits = dict.fromkeys(version['sha'] for version in versions)
+            git(checkout, 'fetch', '-q', '--no-tags', '--depth=1', 'origin', *commits)
         for version in versions:
-            git(checkout, 'fetch', '-q', '--depth=1', 'origin', version['sha'])
-            git(checkout, 'checkout', '-q', '--detach', '--force', 'FETCH_HEAD')
+            git(checkout, 'checkout', '-q', '--detach', '--force', version['sha'])
             version['updated'] = git(checkout, 'show', '-s', '--format=%cI', version['sha']).decode().strip()
             files = git(checkout, 'ls-files', '-z').decode().split('\0')
             legacy_font = 'library/assets/fonts/SourceHanSansSC-VF.otf'

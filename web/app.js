@@ -3,8 +3,14 @@ const $=id=>document.getElementById(id);
 const date=value=>new Date(value).toLocaleString('zh-CN',{hour12:false});
 fetch('versions.json',{cache:'no-store'}).then(response=>{if(!response.ok)throw Error('版本清单尚未发布');return response.json()}).then(data=>{
   const versions=data.versions;
-  if(!versions.length)throw Error('暂无已发布分支');
-  $('version').replaceChildren(...versions.map(v=>new Option(v.branch==='main'?'main · 正式基线':v.branch,v.id)));
+  if(!versions.length){
+    $('version').replaceChildren(new Option('暂无开发分支'));
+    $('title').textContent='暂无待预览的开发分支';
+    $('details').textContent='推送含有新提交的开发分支后，下次刷新会自动收录。';
+    $('empty').textContent='可通过右上角的「正式网站」查看已合入的版本。';
+    return;
+  }
+  $('version').replaceChildren(...versions.map(v=>new Option(v.branch,v.id)));
   $('version').disabled=false;
   $('generated').textContent='预览生成于 '+date(data.generated)+' · 约每 30 分钟检查更新';
   function select(id){
