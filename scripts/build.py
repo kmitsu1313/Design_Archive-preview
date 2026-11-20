@@ -80,6 +80,16 @@ def main():
             git(checkout, 'checkout', '-q', '--detach', '--force', 'FETCH_HEAD')
             version['updated'] = git(checkout, 'show', '-s', '--format=%cI', version['sha']).decode().strip()
             files = git(checkout, 'ls-files', '-z').decode().split('\0')
+            legacy_font = 'library/assets/fonts/SourceHanSansSC-VF.otf'
+            if legacy_font in files:
+                references = subprocess.run([
+                    'git', '-C', str(checkout), 'grep', '-I', '-i', '-q', '-F',
+                    'SourceHanSansSC-VF', '--', '.', ':(exclude)' + legacy_font,
+                ])
+                if references.returncode == 1:
+                    files.remove(legacy_font)
+                else:
+                    references.check_returncode()
             target = OUT / version['id']
             for name in filter(None, files):
                 path = Path(name)
