@@ -46,9 +46,14 @@ def output(changed):
 def main():
     branches = pages(f'repos/{SOURCE}/branches')
     prs = pages(f'repos/{SOURCE}/pulls?state=open')
+    main_sha = next(b['commit']['sha'] for b in branches if b['name'] == 'main')
     versions = []
     for branch in sorted(branches, key=lambda b: (b['name'] != 'main', b['name'])):
         name, sha = branch['name'], branch['commit']['sha']
+        if name != 'main' and (sha == main_sha or api(
+            f'repos/{SOURCE}/compare/{main_sha}...{sha}?per_page=1'
+        )['ahead_by'] == 0):
+            continue
         pr = next((p for p in prs if p['head']['ref'] == name and p['head']['repo'] and p['head']['repo']['full_name'] == SOURCE), None)
         key = 'main' if name == 'main' else f"pr-{pr['number']}" if pr else 'branch-' + hashlib.sha256(name.encode()).hexdigest()[:12]
         versions.append({'id': key, 'branch': name, 'sha': sha, 'path': key + '/', 'pr': pr['html_url'] if pr else None, 'title': pr['title'] if pr else name})
